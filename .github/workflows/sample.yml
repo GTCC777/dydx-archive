@@ -1,0 +1,28 @@
+name: sample
+on:
+  schedule:
+    - cron: '7 * * * *'   # hourly at :07 (GH cron jitters; rows are block-stamped so jitter is harmless)
+  workflow_dispatch: {}
+permissions:
+  contents: write
+concurrency:
+  group: sample
+  cancel-in-progress: false
+jobs:
+  sample:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node sample.mjs
+      - name: Commit sample
+        run: |
+          git config user.name "dydx-archive-bot"
+          git config user.email "info@theaslangroupllc.com"
+          git add data/
+          git commit -m "sample $(date -u +%Y-%m-%dT%H:%MZ)" || exit 0
+          git pull --rebase origin main
+          git push
