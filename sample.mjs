@@ -30,11 +30,19 @@ if (!Number.isFinite(height) || !chainTime) throw new Error('bad_block_header');
 const { data: perps, source } = await getJson('/dydxprotocol/perpetuals/perpetual?pagination.limit=1000');
 if (!Array.isArray(perps.perpetual) || perps.perpetual.length < 50) throw new Error(`suspicious_perp_count_${perps.perpetual?.length}`);
 
+// oracle prices (id-joined) so OI is expressible in USD and funding-rate math is derivable
+const { data: priceData } = await getJson('/dydxprotocol/prices/market?pagination.limit=1000');
+const prices = new Map((priceData.market_prices ?? []).map(p => [p.id, p]));
+
 const markets = {};
 for (const p of perps.perpetual) {
   const t = p.params?.ticker;
   if (!t) continue;
-  markets[t] = { fi: p.funding_index, oi: p.open_interest, ar: p.params.atomic_resolution };
+  const px = prices.get(p.params.market_id);
+  markets[t] = {
+    fi: p.funding_index, oi: p.open_interest, ar: p.params.atomic_resolution,
+    ...(px ? { px: px.price, pexp: px.exponent } : {}),
+  };
 }
 
 const row = JSON.stringify({ ts: new Date().toISOString(), height, chain_time: chainTime, source, n: Object.keys(markets).length, markets });
